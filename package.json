@@ -1,0 +1,9 @@
+{
+  "name": "users",
+  "version": "1.0.0",
+  "description": "A web application which uses a JSON:API standard to feed a React frontend",
+  "main": "index.js",
+  "repository": "https://github.com/LearnLab/users.git",
+  "author": "Diego Castillo Giraldo",
+  "license": "MIT"
+}
