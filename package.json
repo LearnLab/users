@@ -1,9 +1,22 @@
 {
   "name": "users",
-  "version": "1.0.0",
-  "description": "A web application which uses a JSON:API standard to feed a React frontend",
-  "main": "index.js",
-  "repository": "https://github.com/LearnLab/users.git",
-  "author": "Diego Castillo Giraldo",
-  "license": "MIT"
+  "version": "0.0.0",
+  "private": false,
+  "scripts": {
+    "start": "node app.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "express": "~4.16.1",
+    "jest": "^26.6.3",
+    "pg": "^8.5.1",
+    "supertest": "^6.0.1"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "coveragePathIgnorePatterns": [
+      "/node_modules/"
+    ]
+  }
 }

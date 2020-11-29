@@ -26,28 +26,3 @@ Session information
 Created at   : NON NULL,
 Updated at   : NON NULL,
 Last sign in : NON NULL,
-
-Example answer
-
-{
-    "user": {
-        "username": "0325.diego",
-        "email": "0325.diego@gmail.com",
-        "name": "Diego Castillo Giraldo",
-        "city": "Cali",
-        "country": "Colombia",
-        "website": "onemeapp.herokuapps.com",
-        "image": "https://images.com/r03c49r95yq47yw9j38j74wy.jpg",
-        "description": "Avid learner, who needs to be constantly moving and growing his skill set.",
-        "interests": "physics, biology, programming, mathematics, chemistry, economics",
-        "created_at": "22/11/20 12:45:38",
-        "updated_at": "22/11/20 14:26:13",
-        "last_sign_in": "22/11/20 14:10:10"
-    }
-}
-
-## API endpoints
-
-/api/v1/users/
-/api/v1/users/{user}
-
