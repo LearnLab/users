@@ -26,16 +26,29 @@ app.use(function(req, res, next) {
 
 // Error handler
 app.use(function(err, req, res, next) {
-  console.log("The error was ", err.name);
+  console.log("The error was", err);
 
   if (err.name === 'UnauthorizedError') {
-    res.status(401).json({
+    return res.status(401).json({
       "errors": [
         {
           "status": "401",
           "source": { "pointer": req.path },
           "title": err.name,
           "detail": "You're not allowed to access this resource."
+        }
+      ]
+    });
+  }
+
+  if (err.name === 'URIError') {
+    return res.type('application/vnd.api+json').status(400).json({
+      "errors": [
+        {
+          "status": "400",
+          "source": { "pointer": "/data/attributes" },
+          "title": err.name,
+          "detail": "Failed to decode the URI param"
         }
       ]
     });
