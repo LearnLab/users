@@ -231,6 +231,133 @@ const createUser = async (req, res) => {
 };
 
 /**
+ * Update user
+ * @param {object} req
+ * @param {object} res
+ * @returns {object} object
+ */
+const updateUser = async (req, res) => {
+    let errors = [];
+    let user = {};
+
+    /**
+     * Top level fields
+     */
+    if ( !('data' in req.body) ) {
+        return res.status(400).type('application/vnd.api+json').json({
+            "status": "400",
+            "source": { "pointer": "/" },
+            "title": "Bad Request",
+            "detail": "The top level field data is missing from the request body"
+        });
+    } else {
+        if ( !('type' in req.body.data) ) {
+            return res.status(400).type('application/vnd.api+json').json({
+                "status": "400",
+                "source": { "pointer": "/" },
+                "title": "Bad Request",
+                "detail": "The top level field type is missing from the request body"
+            });
+        } else {
+            if (req.body.data.type !== 'users') {
+                return res.status(400).type('application/vnd.api+json').json({
+                    "status": "400",
+                    "source": { "pointer": "/" },
+                    "title": "Bad Request",
+                    "detail": "The resource being registered is not a user"
+                });
+            }
+        }
+    }
+
+    if ( !('attributes' in req.body.data) ) {
+        return res.status(400).type('application/vnd.api+json').json({
+            "status": "400",
+            "source": { "pointer": "/data" },
+            "title": "Bad Request",
+            "detail": "The top level field attributes is missing from the request body"
+        });
+    }
+
+    /**
+     * Validate param user
+     */
+    user.username = req.params.username;
+    if (!validUsernamePattern.test(user.username)) {
+        errors.push({
+            "status": "400",
+            "source": { "pointer": "/data/attributes/username" },
+            "title": "Bad Request",
+            "detail": "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)"
+        });
+    }
+
+    /**
+     * Email field
+     */
+    if ( 'email' in req.body.data.attributes ) {
+
+        user.email = trim(req.body.data.attributes.email);
+        if ( !validEmailPattern.test(user.email) ) {
+            errors.push({
+                "status": "400",
+                "source": { "pointer": "/data/attributes/email" },
+                "title": "Bad Request",
+                "detail": "The email provided is not valid, it has to follow the format someone@somewhere.some"
+            });
+        }
+
+    }
+
+    /**
+     * Name
+     */
+    if ( 'name' in req.body.data.attributes ) {
+
+        user.name = trim(req.body.data.attributes.name);
+        if ( !validNamePattern.test(user.name) || user.name.length > 32) {
+            errors.push({
+                "status": "400",
+                "source": { "pointer": "/data/attributes/name" },
+                "title": "Bad Request",
+                "detail": "Sorry, the name provided contains illegal characters, it can only contain letters"
+            });
+        }
+
+    }
+
+    // In case there are errors, end it here and return the errors
+    if (errors.length > 0) {
+        return res.type('application/vnd.api+json').status(400).json({ "errors": errors });
+    }
+
+    /**
+     * Update user
+     */
+    const updateQuery = 'UPDATE users SET email=$1, name=$2, updated_at=NOW() WHERE users.username=$3';
+    const updateValues = [user.email, user.name, user.username];
+
+    try {
+        let updateResult = await db.query(updateQuery, updateValues);
+
+        return res.type('application/vnd.api+json').status(404).json({
+            "result": updateResult
+        });
+    } catch(error) {
+        return res.type('application/vnd.api+json').status(500).json({
+            "error": error
+        });
+    }
+
+    return res.type('application/vnd.api+json').status(404).json({
+        "errors": [{
+            "title": "Controller method not found",
+            "message": "Sorry, but it seems like the method controller is not implemented yet."
+        }]
+    });
+};
+
+/**
  * Delete user
  * @param {object} req
  * @param {object} res
@@ -402,6 +529,7 @@ const getUser = async (req, res) => {
 
 module.exports = {
     createUser,
+    updateUser,
     deleteUser,
     getUser
 };
