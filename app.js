@@ -8,11 +8,38 @@ var apiRouter = require('./routes/api');
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Verify the clients Accept and Content-Type headers
+app.use((req, res, next) => {
+  if(!req.accepts().includes('application/vnd.api+json')) {
+    return res.type('application/vnd.api+json').status(406).json({
+      "errors": [{
+        "status": "406",
+        "title": "Not Acceptable",
+        "detail": "The client has not specified the application/vnd.api+json in the accept header"
+      }]
+    });
+  }
+
+  if(req.headers['content-type'] !== 'application/vnd.api+json') {
+    return res.type('application/vnd.api+json').status(415).json({
+      "errors": [{
+        "status": "415",
+        "title": "Unsupported Media Type",
+        "detail": "The content-type header of the request is not supported, it has to be of type application/vnd.api+json"
+      }]
+    });
+  }
+
+  res.type('application/vnd.api+json');
+
+  next();
+});
+
 app.use('/api/v1', apiRouter);
 
 // Catch 404 and return error response
 app.use(function(req, res, next) {
-  res.status(404).json({
+  return res.status(404).json({
     "errors": [
       {
         "status": "404",
@@ -42,7 +69,7 @@ app.use(function(err, req, res, next) {
   }
 
   if (err.name === 'URIError') {
-    return res.type('application/vnd.api+json').status(400).json({
+    return res.status(400).json({
       "errors": [
         {
           "status": "400",
