@@ -541,9 +541,45 @@ const getUser = async (req, res) => {
     return res.status(500).json({ "errors": [publicError] });
 };
 
+/**
+ * Get all users
+ * @param {object} req
+ * @param {object} res
+ * @returns {object} object
+ */
+const getAllUsers = async (req, res) => {
+    /**
+     * SQL Query
+     */
+    const getAllUsersQuery = 'SELECT username, email, name, created_at FROM users LIMIT 10';
 
-    return res.type('application/vnd.api+json').status(500).json({
-        "errors": [publicError]
+    let getAllUsersResult = {};
+
+    try {
+        getAllUsersResult = await db.query(getAllUsersQuery, []);
+    } catch(error) {
+        let publicError = JSONcopy(errors["500"]);
+        publicError.detail = error;
+
+        return res.status(500).json({ "errors": [publicError] });
+    }
+
+    let allUsers = [];
+    getAllUsersResult.rows.forEach((user) => {
+        let userRecord = {
+            "type": "users",
+            "id": user.username,
+            "attributes": user
+        };
+
+        allUsers.push(userRecord);
+    });
+
+    return res.status(200).json({
+        "links": {
+            "self": req.path
+        },
+        "data": allUsers
     });
 };
 
@@ -551,5 +587,6 @@ module.exports = {
     createUser,
     updateUser,
     deleteUser,
-    getUser
+    getUser,
+    getAllUsers
 };
