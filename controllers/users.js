@@ -20,9 +20,12 @@ const validNamePattern = /^([a-záéíóúñ]{3,10}\s?)+$/i;
  * Global errors
  */
 const errors = {
+    "400": {
+        "status": "400",
+        "title": "Bad Request"
+    },
     "500": {
         "status": "500",
-        "source": { "pointer": "/" },
         "title": "Unknown Internal Server Error"
     }
 };
@@ -41,139 +44,224 @@ const trim = (str) => {
 };
 
 /**
+ * Require top level fields from the API+JSON specification
+ * If the requirement is not fulfilled, return an error
+ *
+ * @param {object} req
+ * @param {object} res
+ * @returns {object} object
+ */
+const requireTopLevel = (req, res) => {
+    let error = JSONcopy(errors["400"]);
+
+    if ( !('data' in req.body) ) {
+        error.source = { "pointer": "/" };
+        error.detail = "The top level field data is missing from the request body";
+
+        return error;
+    }
+
+    if ( !('type' in req.body.data) ) {
+        error.source = { "pointer": "/" };
+        error.detail = "The top level field type is missing from the request body";
+
+        return error;
+    }
+
+    if (req.body.data.type !== 'users') {
+        error.source = { "pointer": "/data" };
+        error.detail = "The resource being registered is not a user";
+
+        return error;
+    }
+
+    if ( !('attributes' in req.body.data) ) {
+        error.source = { "pointer": "/data" };
+        error.detail = "The top level field attributes is missing from the request body";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Require username, or return an error (not a server response) when
+ * missing
+ *
+ * @param {object} req
+ * @returns {object} error
+ */
+const requireUsername = (req) => {
+    if ( !('username' in req.body.data.attributes) ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/username" };
+        error.detail = "Sorry, the username is missing from the body of the request";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Validate username, or return an error (not a server response) when
+ * not valid
+ *
+ * @param {string} username
+ * @returns {object} error
+ */
+const validateUsername = (username) => {
+    if (!validUsernamePattern.test(username)) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/username" };
+        error.detail = "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Require an email, or return an error (not a server error) when
+ * missing
+ *
+ * @param {object} req
+ * @returns {object} error
+ */
+const requireEmail = (req) => {
+    if ( !('email' in req.body.data.attributes) ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/email" };
+        error.detail = "Sorry, the email is missing from the body of the request";
+
+        return error;
+
+    }
+
+    return {};
+};
+
+/**
+ * Validate an email, or return an error (not a server error) when
+ * invalid
+ *
+ * @param {string} email
+ * @returns {object} error
+ */
+const validateEmail = (email) => {
+    if ( !validEmailPattern.test(email) ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/email" };
+        error.detail = "The email provided is not valid, it has to follow the format someone@somewhere.some";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Require a name, or return an error (not a server error) when
+ * missing
+ *
+ * @param {object} req
+ * @returns {object} error
+ */
+const requireName = (req) => {
+    if ( !('name' in req.body.data.attributes) ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/name" };
+        error.detail = "Sorry, the name field is missing from the body of the request";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Validate a name, or return an error (not a server error) when
+ * invalid
+ *
+ * @param {string} email
+ * @returns {object} error
+ */
+const validateName = (name) => {
+    if ( !validNamePattern.test(name) || name.length > 32) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/name" };
+        error.detail = "Sorry, the name provided contains illegal characters, it can only contain letters";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
  * Create a user
  * @param {object} req
  * @param {object} res
  * @returns {object} user object
  */
 const createUser = async (req, res) => {
-    let errors = [];
+    let createErrors = [];
     let user = {};
 
-    /**
-     * Top level fields
-     */
-    if ( !('data' in req.body) ) {
-        return res.status(400).type('application/vnd.api+json').json({
-            "status": "400",
-            "source": { "pointer": "/" },
-            "title": "Bad Request",
-            "detail": "The top level field data is missing from the request body"
-        });
-    } else {
-        if ( !('type' in req.body.data) ) {
-            return res.status(400).type('application/vnd.api+json').json({
-                "status": "400",
-                "source": { "pointer": "/" },
-                "title": "Bad Request",
-                "detail": "The top level field type is missing from the request body"
-            });
-        } else {
-            if (req.body.data.type !== 'users') {
-                return res.status(400).type('application/vnd.api+json').json({
-                    "status": "400",
-                    "source": { "pointer": "/" },
-                    "title": "Bad Request",
-                    "detail": "The resource being registered is not a user"
-                });
-            }
-        }
-    }
+    const topLevelError = requireTopLevel(req, res);
 
-    if ( !('attributes' in req.body.data) ) {
-        return res.status(400).type('application/vnd.api+json').json({
-            "status": "400",
-            "source": { "pointer": "/data" },
-            "title": "Bad Request",
-            "detail": "The top level field attributes is missing from the request body"
+    // Check if the error is empty
+    if( Object.keys(topLevelError).length > 0 ) {
+        return res.status(400).json({
+            "errors": [topLevelError]
         });
     }
 
     /**
      * Username
      */
-    if ( !('username' in req.body.data.attributes) ) {
-
-        errors.push({
-            "status": "400",
-            "source": { "pointer": "/data/attributes/username" },
-            "title": "Bad Request",
-            "detail": "Sorry, the username is missing from the body of the request"
-        });
-
-    } else {
-
+    let usernameError = requireUsername(req);
+    if( Object.keys(usernameError).length === 0 ) {
         user.username = trim(req.body.data.attributes.username);
-        if (!validUsernamePattern.test(user.username)) {
-            errors.push({
-                "status": "400",
-                "source": { "pointer": "/data/attributes/username" },
-                "title": "Bad Request",
-                "detail": "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)"
-            });
-        }
-
+        usernameError = validateUsername(user.username);
     }
 
     /**
      * Email field
      */
-    if ( !('email' in req.body.data.attributes) ) {
-
-        errors.push({
-            "status": "400",
-            "source": { "pointer": "/data/attributes/email" },
-            "title": "Bad Request",
-            "detail": "Sorry, the email is missing from the body of the request"
-        });
-
-    } else {
-
+    let emailError = requireEmail(req);
+    if( Object.keys(emailError).length === 0 ) {
         user.email = trim(req.body.data.attributes.email);
-        if ( !validEmailPattern.test(user.email) ) {
-            errors.push({
-                "status": "400",
-                "source": { "pointer": "/data/attributes/email" },
-                "title": "Bad Request",
-                "detail": "The email provided is not valid, it has to follow the format someone@somewhere.some"
-            });
-        }
-
+        emailError = validateEmail(user.email);
     }
 
     /**
      * Name
      */
-    if ( !('name' in req.body.data.attributes) ) {
-
-        errors.push({
-            "status": "400",
-            "source": { "pointer": "/data/attributes/name" },
-            "title": "Bad Request",
-            "detail": "Sorry, the name field is missing from the body of the request"
-        });
-
-    } else {
-
+    let nameError = requireName(req);
+    if( Object.keys(nameError).length === 0 ) {
         user.name = trim(req.body.data.attributes.name);
-        if ( !validNamePattern.test(user.name) || user.name.length > 32) {
-            errors.push({
-                "status": "400",
-                "source": { "pointer": "/data/attributes/name" },
-                "title": "Bad Request",
-                "detail": "Sorry, the name provided contains illegal characters, it can only contain letters"
-            });
-        }
-
+        nameError = validateName(user.name);
     }
 
+    if(Object.keys(usernameError).length !== 0)
+        createErrors.push(usernameError);
+
+    if(Object.keys(emailError).length !== 0)
+        createErrors.push(emailError);
+
+    if(Object.keys(nameError).length !== 0)
+        createErrors.push(nameError);
+
     // In case there are errors, end it here and return the errors
-    if (errors.length > 0) {
-        return res.type('application/vnd.api+json').status(400).json({ "errors": errors });
+    if (createErrors.length > 0) {
+        return res.status(400).json({ "errors": createErrors });
     }
 
     /**
-     * Check that the username doesn't exit
+     * Check that the username doesn't exist
      */
     const findUsersQuery = 'SELECT username, email FROM users WHERE users.username=$1 OR users.email=$2';
     const findUsersValues = [user.username, user.email];
@@ -183,24 +271,18 @@ const createUser = async (req, res) => {
     try {
         result = await db.query(findUsersQuery, findUsersValues);
     } catch (error) {
-        let publicError = errors["500"];
+        let publicError = JSONcopy(errors["500"]);
         publicError.message = error;
 
-        return res
-            .type('application/vnd.api+json')
-            .status(500)
-            .json({
-                "errors": [publicError]
-            });
+        return res.status(500).json({"errors": [publicError]});
     }
 
     if (result.rowCount !== 0) {
-        return res.status(400).type('application/vnd.api+json').json({
-            "status": "400",
-            "source": { "pointer": "/data/attributes" },
-            "title": "Bad Request",
-            "detail": "The username and/or the email are/is already taken. Are you a registered user?"
-        });
+        let publicError = JSONcopy(errors["400"]);
+        publicError.source = { "pointer": "/data/attributes" };
+        publicError.detail = "The username and/or the email are already taken. Are you a registered user?";
+
+        return res.status(400).json(publicError);
     }
 
     // All good, proceed with the insertion
@@ -214,21 +296,13 @@ const createUser = async (req, res) => {
     try {
         const insertResult = await db.query(createUserQuery, createUserValues);
     } catch (error) {
-        let publicError = errors["500"];
+        let publicError = JSONcopy(errors["500"]);
         publicError.message = error;
 
-        return res
-            .type('application/vnd.api+json')
-            .status(500)
-            .json({
-                "errors": [publicError]
-            });
+        return res.status(500).json({"errors": [publicError]});
     }
 
-    return res
-        .type('application/vnd.api+json')
-        .status(201)
-        .json({
+    return res.status(201).json({
             "data": {
                 "type": "users",
                 "attributes": user,
@@ -249,42 +323,12 @@ const updateUser = async (req, res) => {
     let errors = [];
     let user = {};
 
-    /**
-     * Top level fields
-     */
-    if ( !('data' in req.body) ) {
-        return res.status(400).type('application/vnd.api+json').json({
-            "status": "400",
-            "source": { "pointer": "/" },
-            "title": "Bad Request",
-            "detail": "The top level field data is missing from the request body"
-        });
-    } else {
-        if ( !('type' in req.body.data) ) {
-            return res.status(400).type('application/vnd.api+json').json({
-                "status": "400",
-                "source": { "pointer": "/" },
-                "title": "Bad Request",
-                "detail": "The top level field type is missing from the request body"
-            });
-        } else {
-            if (req.body.data.type !== 'users') {
-                return res.status(400).type('application/vnd.api+json').json({
-                    "status": "400",
-                    "source": { "pointer": "/" },
-                    "title": "Bad Request",
-                    "detail": "The resource being registered is not a user"
-                });
-            }
-        }
-    }
+    const topLevelError = requireTopLevel(req, res);
 
-    if ( !('attributes' in req.body.data) ) {
-        return res.status(400).type('application/vnd.api+json').json({
-            "status": "400",
-            "source": { "pointer": "/data" },
-            "title": "Bad Request",
-            "detail": "The top level field attributes is missing from the request body"
+    // Check if the error is empty
+    if( Object.keys(topLevelError).length > 0 ) {
+        return res.status(400).json({
+            "errors": [topLevelError]
         });
     }
 
@@ -292,52 +336,27 @@ const updateUser = async (req, res) => {
      * Validate param user
      */
     user.username = req.params.username;
-    if (!validUsernamePattern.test(user.username)) {
-        errors.push({
-            "status": "400",
-            "source": { "pointer": "/data/attributes/username" },
-            "title": "Bad Request",
-            "detail": "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)"
-        });
-    }
+    errors.push( validateUsername(user.username) );
 
     /**
      * Email field
      */
     if ( 'email' in req.body.data.attributes ) {
-
         user.email = trim(req.body.data.attributes.email);
-        if ( !validEmailPattern.test(user.email) ) {
-            errors.push({
-                "status": "400",
-                "source": { "pointer": "/data/attributes/email" },
-                "title": "Bad Request",
-                "detail": "The email provided is not valid, it has to follow the format someone@somewhere.some"
-            });
-        }
-
+        errors.push( validateEmail(user.email) );
     }
 
     /**
      * Name
      */
     if ( 'name' in req.body.data.attributes ) {
-
         user.name = trim(req.body.data.attributes.name);
-        if ( !validNamePattern.test(user.name) || user.name.length > 32) {
-            errors.push({
-                "status": "400",
-                "source": { "pointer": "/data/attributes/name" },
-                "title": "Bad Request",
-                "detail": "Sorry, the name provided contains illegal characters, it can only contain letters"
-            });
-        }
-
+        errors.push( validateName(user.name) );
     }
 
     // In case there are errors, end it here and return the errors
     if (errors.length > 0) {
-        return res.type('application/vnd.api+json').status(400).json({ "errors": errors });
+        return res.status(400).json({ "errors": errors });
     }
 
     /**
@@ -346,23 +365,53 @@ const updateUser = async (req, res) => {
     const updateQuery = 'UPDATE users SET email=$1, name=$2, updated_at=NOW() WHERE users.username=$3';
     const updateValues = [user.email, user.name, user.username];
 
-    try {
-        let updateResult = await db.query(updateQuery, updateValues);
+    let updateResult = {};
 
-        return res.type('application/vnd.api+json').status(404).json({
-            "result": updateResult
-        });
+    try {
+        updateResult = await db.query(updateQuery, updateValues);
     } catch(error) {
-        return res.type('application/vnd.api+json').status(500).json({
-            "error": error
+        let publicError = JSONcopy(errors["500"]);
+        publicError.message = error;
+
+        return res.status(500).json({ "errors": [publicError] });
+    }
+
+    if(updateResult.rowCount === 0) {
+        return res.status(404).json({
+            "errors": [{
+                "status": "404",
+                "title": "Resource Not Found",
+                "source": { "pointer": "/users/{user}" },
+                "detail": "The user you are trying to update does not exist, maybe you misspoke?"
+            }]
         });
     }
 
-    return res.type('application/vnd.api+json').status(404).json({
-        "errors": [{
-            "title": "Controller method not found",
-            "message": "Sorry, but it seems like the method controller is not implemented yet."
-        }]
+    /**
+     * Get user from the database
+     */
+    const getUserQuery = 'SELECT username, name, email, created_at, updated_at FROM users WHERE users.username=$1';
+    const getUserValue = [user.username];
+
+    let userResult = {};
+
+    try {
+        userResult = await db.query(getUserQuery, getUserValue);
+    } catch(error) {
+        let publicError = JSONcopy(errors["500"]);
+        publicError.message = error;
+
+        return res.status(500).json({ "errors": [publicError] });
+    }
+
+    user = userResult.rows[0];
+
+    return res.status(200).json({
+        "data": {
+            "type": "users",
+            "id": user.username,
+            "attributes": user
+        }
     });
 };
 
@@ -377,14 +426,9 @@ const deleteUser = async (req, res) => {
     /**
      * Check if the username param is correct
      */
-    if (!validUsernamePattern.test(req.params.username)) {
-        return res.type('application/vnd.api+json').status(400).json({
-            "status": "400",
-            "source": { "pointer": "/username" },
-            "title": "Bad Request",
-            "detail": "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)"
-        });
-    }
+    const usernameError = validateUsername(req.params.username);
+    if (Object.keys(usernameError).length !== 0)
+        return res.status(400).json({ "errors": [usernameError] });
 
     /**
      * Check that there is exactly one member with this username
@@ -397,22 +441,14 @@ const deleteUser = async (req, res) => {
     try {
         result = await db.query(findUserQuery, findUserValues);
     } catch (error) {
-        let publicError = errors["500"];
+        let publicError = JSONcopy(errors["500"]);
         publicError.message = error;
 
-        return res
-            .type('application/vnd.api+json')
-            .status(500)
-            .json({
-                "errors": [publicError]
-            });
+        return res.status(500).json({"errors": [publicError]});
     }
 
-    if(result.rowCount === 0) {
-        return res
-            .type('application/vnd.api+json')
-            .status(404)
-            .json({
+    if(result.rowCount !== 1) {
+        return res.status(404).json({
                 "errors": [
                     {
                         "status": "404",
@@ -421,18 +457,6 @@ const deleteUser = async (req, res) => {
                         "detail": "There's no user with that username"
                     }
                 ]
-            });
-    }
-
-    if(result.rowCount > 1) {
-        let publicError = errors["500"];
-        publicError.message = "Somehow there is more than one user in the database";
-
-        return res
-            .type('application/vnd.api+json')
-            .status(500)
-            .json({
-                "errors": [publicError]
             });
     }
 
@@ -447,23 +471,13 @@ const deleteUser = async (req, res) => {
     try {
         executeDelete = db.query(deleteQuery, deleteValue);
     } catch (error) {
-        let publicError = errors["500"];
+        let publicError = JSONcopy(errors["500"]);
         publicError.message = error;
 
-        return res
-            .type('application/vnd.api+json')
-            .status(500)
-            .json({
-                "errors": [publicError]
-            });
+        return res.status(500).json({ "errors": [publicError] });
     }
 
-    return res
-        .type('application/vnd.api+json')
-        .status(204)
-        .json({
-            "data": {}
-        });
+    return res.status(204).json({ "data": {} });
 };
 
 /**
@@ -476,14 +490,9 @@ const getUser = async (req, res) => {
     /**
      * First check the username is valid
      */
-    if (!validUsernamePattern.test(req.params.username)) {
-        return res.type('application/vnd.api+json').status(400).json({
-            "status": "400",
-            "source": { "pointer": "/username" },
-            "title": "Bad Request",
-            "detail": "The username has illegal characters, it can only include letters, numbers and dashes (not at the end nor at the beginning)"
-        });
-    }
+    const usernameError = validateUsername(req.params.username);
+    if(Object.keys(usernameError).length !== 0)
+        return res.status(400).json({ "errors": [usernameError] });
 
     /**
      * Make the query
@@ -496,16 +505,14 @@ const getUser = async (req, res) => {
     try {
         getUserResult = await db.query(getUserQuery, getUserValue);
     } catch (error) {
-        let publicError = errors["500"];
+        let publicError = JSONcopy(errors["500"]);
         publicError.message = error;
 
-        return res.type('application/vnd.api+json').status(500).json({
-            "errors": [publicError]
-        });
+        return res.status(500).json({ "errors": [publicError] });
     }
 
     if(getUserResult.rowCount === 0) {
-        return res.type('application/vnd.api+json').status(404).json({
+        return res.status(404).json({
             "status": "404",
             "source": { "pointer": "/username" },
             "title": "User Not Found",
@@ -516,7 +523,7 @@ const getUser = async (req, res) => {
     if(getUserResult.rowCount === 1) {
         const user = getUserResult.rows[0];
 
-        return res.type('application/vnd.api+json').status(200).json({
+        return res.status(200).json({
             "data": {
                 "type": "users",
                 "id": user.username,
@@ -528,8 +535,12 @@ const getUser = async (req, res) => {
         });
     }
 
-    let publicError = errors["500"];
-    publicError.message = "Somewhere something happened, I don't really know what";
+    let publicError = JSONcopy(errors["500"]);
+    publicError.detail = "Somewhere something happened, I don't really know what";
+
+    return res.status(500).json({ "errors": [publicError] });
+};
+
 
     return res.type('application/vnd.api+json').status(500).json({
         "errors": [publicError]
