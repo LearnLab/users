@@ -12,7 +12,7 @@ const pool = new Pool({
  * @param {object} req
  * @param {object} res
  * @returns {object} object
- **/
+ */
 const query = (text, params) => {
     return new Promise((resolve, reject) => {
         pool.query(text, params).then((res) => {
@@ -24,5 +24,6 @@ const query = (text, params) => {
 };
 
 module.exports = {
-    query
+    query,
+    setQuery
 };
