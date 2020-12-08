@@ -1,6 +1,15 @@
 const db = require('../db/');
 
 /**
+ * Deep Copy via JSON helper methods
+ * @param {object} source
+ * @returns {object} target
+ */
+const JSONcopy = (source) => {
+    return JSON.parse(JSON.stringify(source));
+};
+
+/**
  * Global regex patterns
  */
 const validUsernamePattern = /^[a-z\d][a-z\d-]{2,14}[a-z\d]$/i;
