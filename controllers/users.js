@@ -1,4 +1,5 @@
 const db = require('../db/');
+const { User } = require('../models/user');
 
 /**
  * Deep Copy via JSON helper methods
@@ -15,6 +16,8 @@ const JSONcopy = (source) => {
 const validUsernamePattern = /^[a-z\d][a-z\d-]{2,14}[a-z\d]$/i;
 const validEmailPattern = /^[a-z0-9]+[\.\w-]*@[a-z]+([\w-]+\.)+[a-z]{2,4}$/i;
 const validNamePattern = /^([a-záéíóúñ]{3,10}\s?)+$/i;
+const ensureCharacterPattern = /\w/;
+const ensureDigitPattern = /\d/;
 
 /**
  * Global errors
@@ -163,6 +166,55 @@ const validateEmail = (email) => {
 };
 
 /**
+ * Require a password, or return an error (not a server error) when
+ * missing
+ *
+ * @param {object} req
+ * @returns {object} error
+ */
+const requirePasswords = (req) => {
+    if ( !('password' in req.body.data.attributes) || !('confirm_password' in req.body.data.attributes) ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/password" };
+        error.detail = "Sorry, the password fields are missing from the body of the request";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
+ * Validate a password, or return an error (not a server error) when
+ * invalid
+ *
+ * @param {object} attributes
+ * @returns {object} error
+ */
+const validatePassword = (attributes) => {
+    const password = attributes.password;
+    const conf_password = attributes.confirm_password;
+
+    if ( !ensureCharacterPattern.test(password) || !ensureDigitPattern.test(password) || password.length < 10) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/password" };
+        error.detail = "Sorry, the password provided is not valid, it should have at least 10 characters and numbers";
+
+        return error;
+    }
+
+    if ( password !== conf_password ) {
+        let error = JSONcopy(errors["400"]);
+        error.source = { "pointer": "/data/attributes/password" };
+        error.detail = "Sorry, the password provided is not the same as the confirmation password";
+
+        return error;
+    }
+
+    return {};
+};
+
+/**
  * Require a name, or return an error (not a server error) when
  * missing
  *
@@ -238,6 +290,15 @@ const createUser = async (req, res) => {
     }
 
     /**
+     * Password
+     */
+    let passwordError = requirePasswords(req);
+    if( Object.keys(passwordError).length === 0 ) {
+        user.hash = await User.setHash(req.body.data.attributes.password);
+        passwordError = validatePassword(req.body.data.attributes);
+    }
+
+    /**
      * Name
      */
     let nameError = requireName(req);
@@ -245,6 +306,7 @@ const createUser = async (req, res) => {
         user.name = trim(req.body.data.attributes.name);
         nameError = validateName(user.name);
     }
+
 
     if(Object.keys(usernameError).length !== 0)
         createErrors.push(usernameError);
@@ -254,6 +316,9 @@ const createUser = async (req, res) => {
 
     if(Object.keys(nameError).length !== 0)
         createErrors.push(nameError);
+
+    if(Object.keys(passwordError).length !== 0)
+        createErrors.push(passwordError);
 
     // In case there are errors, end it here and return the errors
     if (createErrors.length > 0) {
@@ -293,6 +358,7 @@ const createUser = async (req, res) => {
         user.name
     ];
 
+    /**
     try {
         const insertResult = await db.query(createUserQuery, createUserValues);
     } catch (error) {
@@ -301,6 +367,7 @@ const createUser = async (req, res) => {
 
         return res.status(500).json({"errors": [publicError]});
     }
+    **/
 
     return res.status(201).json({
             "data": {
