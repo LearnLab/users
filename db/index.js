@@ -24,6 +24,5 @@ const query = (text, params) => {
 };
 
 module.exports = {
-    query,
-    setQuery
+    query
 };
