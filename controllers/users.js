@@ -16,7 +16,8 @@ const JSONcopy = (source) => {
 const validUsernamePattern = /^[a-z\d][a-z\d-]{2,14}[a-z\d]$/i;
 const validEmailPattern = /^[a-z0-9]+[\.\w-]*@[a-z]+([\w-]+\.)+[a-z]{2,4}$/i;
 const validNamePattern = /^([a-záéíóúñ]{3,10}\s?)+$/i;
-const ensureCharacterPattern = /\w/;
+const ensureLowercasePattern = /[a-záéíóúñ]/;
+const ensureUppercasePattern = /[A-ZÁÉÍÓÚÑ]/;
 const ensureDigitPattern = /\d/;
 
 /**
@@ -195,10 +196,14 @@ const validatePassword = (attributes) => {
     const password = attributes.password;
     const conf_password = attributes.confirm_password;
 
-    if ( !ensureCharacterPattern.test(password) || !ensureDigitPattern.test(password) || password.length < 10) {
+    if ( !ensureLowercasePattern.test(password) ||
+         !ensureUppercasePattern.test(password) ||
+         !ensureDigitPattern.test(password) ||
+         password.length < 10 ||
+         password.length > 25) {
         let error = JSONcopy(errors["400"]);
         error.source = { "pointer": "/data/attributes/password" };
-        error.detail = "Sorry, the password provided is not valid, it should have at least 10 characters and numbers";
+        error.detail = "Sorry, the password provided is not valid, it should have at least 10 characters long (25 at most) and have letters (upper and lowercase) and numbers";
 
         return error;
     }
