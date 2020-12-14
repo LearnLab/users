@@ -12,8 +12,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Verify the clients Accept and Content-Type headers
 app.use((req, res, next) => {
-  console.log(req.body);
-
   if(!req.accepts().includes('application/vnd.api+json')) {
     return res.type('application/vnd.api+json').status(406).json({
       "errors": [{
