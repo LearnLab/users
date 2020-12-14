@@ -1,14 +1,6 @@
 const db = require('../db/');
 const { User } = require('../models/user');
-
-/**
- * Deep Copy via JSON helper methods
- * @param {object} source
- * @returns {object} target
- */
-const JSONcopy = (source) => {
-    return JSON.parse(JSON.stringify(source));
-};
+const { JSONcopy, trim, requireTopLevel } = require('../lib/helpers');
 
 /**
  * Global regex patterns
@@ -21,7 +13,7 @@ const ensureUppercasePattern = /[A-ZÁÉÍÓÚÑ]/;
 const ensureDigitPattern = /\d/;
 
 /**
- * Global errors
+ * Users global errors
  */
 const errors = {
     "400": {
@@ -35,58 +27,23 @@ const errors = {
 };
 
 /**
- * Remove double and trailing spaces
- * @param {string} string
- * @returns {string} string
- */
-const trim = (str) => {
-    str = str.replace(/\s{2,}/, ' ');
-    str = str.replace(/^\s+/, '');
-    str = str.replace(/\s+$/, '');
-
-    return str;
-};
-
-/**
- * Require top level fields from the API+JSON specification
+ * Require top level user field
+ * type: 'users'
  * If the requirement is not fulfilled, return an error
  *
  * @param {object} req
- * @param {object} res
  * @returns {object} object
  */
-const requireTopLevel = (req, res) => {
-    let error = JSONcopy(errors["400"]);
-
-    if ( !('data' in req.body) ) {
-        error.source = { "pointer": "/" };
-        error.detail = "The top level field data is missing from the request body";
-
-        return error;
-    }
-
-    if ( !('type' in req.body.data) ) {
-        error.source = { "pointer": "/" };
-        error.detail = "The top level field type is missing from the request body";
-
-        return error;
-    }
-
+const requireUserTopLevel = (req) => {
     if (req.body.data.type !== 'users') {
+        let error = JSONcopy(errors["400"]);
         error.source = { "pointer": "/data" };
         error.detail = "The resource being registered is not a user";
 
         return error;
     }
 
-    if ( !('attributes' in req.body.data) ) {
-        error.source = { "pointer": "/data" };
-        error.detail = "The top level field attributes is missing from the request body";
-
-        return error;
-    }
-
-    return {};
+    return null;
 };
 
 /**
@@ -105,7 +62,7 @@ const requireUsername = (req) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -124,7 +81,7 @@ const validateUsername = (username) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -144,7 +101,7 @@ const requireEmail = (req) => {
 
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -163,7 +120,7 @@ const validateEmail = (email) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -182,7 +139,7 @@ const requirePasswords = (req) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -192,9 +149,7 @@ const requirePasswords = (req) => {
  * @param {object} attributes
  * @returns {object} error
  */
-const validatePassword = (attributes) => {
-    const password = attributes.password;
-    const conf_password = attributes.confirm_password;
+const validatePassword = (password, confirm_password) => {
 
     if ( !ensureLowercasePattern.test(password) ||
          !ensureUppercasePattern.test(password) ||
@@ -208,7 +163,7 @@ const validatePassword = (attributes) => {
         return error;
     }
 
-    if ( password !== conf_password ) {
+    if ( password !== confirm_password ) {
         let error = JSONcopy(errors["400"]);
         error.source = { "pointer": "/data/attributes/password" };
         error.detail = "Sorry, the password provided is not the same as the confirmation password";
@@ -216,7 +171,7 @@ const validatePassword = (attributes) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -235,7 +190,7 @@ const requireName = (req) => {
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -249,12 +204,12 @@ const validateName = (name) => {
     if ( !validNamePattern.test(name) || name.length > 32) {
         let error = JSONcopy(errors["400"]);
         error.source = { "pointer": "/data/attributes/name" };
-        error.detail = "Sorry, the name provided contains illegal characters, it can only contain letters";
+        error.detail = "Sorry, the name provided contains illegal characters (it can only contain letters) or it\'s either too short or too long";
 
         return error;
     }
 
-    return {};
+    return null;
 };
 
 /**
@@ -267,20 +222,21 @@ const createUser = async (req, res) => {
     let createErrors = [];
     let user = {};
 
-    const topLevelError = requireTopLevel(req, res);
+    const topLevelError = requireTopLevel(req);
 
-    // Check if the error is empty
-    if( Object.keys(topLevelError).length > 0 ) {
-        return res.status(400).json({
-            "errors": [topLevelError]
-        });
-    }
+    if(topLevelError)
+        return res.status(400).json({ "errors": [topLevelError] });
+
+    const userTopLevelError = requireUserTopLevel(req);
+
+    if(userTopLevelError)
+        return res.status(400).json({ "errors": [userTopLevelError] })
 
     /**
      * Username
      */
     let usernameError = requireUsername(req);
-    if( Object.keys(usernameError).length === 0 ) {
+    if(usernameError) {
         user.username = trim(req.body.data.attributes.username);
         usernameError = validateUsername(user.username);
     }
@@ -289,7 +245,7 @@ const createUser = async (req, res) => {
      * Email field
      */
     let emailError = requireEmail(req);
-    if( Object.keys(emailError).length === 0 ) {
+    if(emailError) {
         user.email = trim(req.body.data.attributes.email);
         emailError = validateEmail(user.email);
     }
@@ -298,7 +254,7 @@ const createUser = async (req, res) => {
      * Password
      */
     let passwordError = requirePasswords(req);
-    if( Object.keys(passwordError).length === 0 ) {
+    if(passwordError) {
         user.hash = await User.setHash(req.body.data.attributes.password);
         passwordError = validatePassword(req.body.data.attributes);
     }
@@ -307,22 +263,22 @@ const createUser = async (req, res) => {
      * Name
      */
     let nameError = requireName(req);
-    if( Object.keys(nameError).length === 0 ) {
+    if(nameError) {
         user.name = trim(req.body.data.attributes.name);
         nameError = validateName(user.name);
     }
 
 
-    if(Object.keys(usernameError).length !== 0)
+    if(usernameError)
         createErrors.push(usernameError);
 
-    if(Object.keys(emailError).length !== 0)
+    if(emailError)
         createErrors.push(emailError);
 
-    if(Object.keys(nameError).length !== 0)
+    if(nameError)
         createErrors.push(nameError);
 
-    if(Object.keys(passwordError).length !== 0)
+    if(passwordError)
         createErrors.push(passwordError);
 
     // In case there are errors, end it here and return the errors
@@ -356,14 +312,19 @@ const createUser = async (req, res) => {
     }
 
     // All good, proceed with the insertion
-    const createUserQuery = 'INSERT INTO users (username, email, name, created_at, updated_at, last_sign_in) VALUES ($1, $2, $3, NOW(), NOW(), NOW())';
+    const createUserQuery = 'INSERT INTO users (username, hash, email, validated, name, created_at, updated_at, last_sign_in) VALUES ($1, $2, $3, FALSE, $4, NOW(), NOW(), NOW())';
     const createUserValues = [
         user.username,
+        user.hash,
         user.email,
         user.name
     ];
 
-    /**
+    const publicUser = {
+        username: user.username,
+        name: user.name
+    };
+
     try {
         const insertResult = await db.query(createUserQuery, createUserValues);
     } catch (error) {
@@ -372,12 +333,11 @@ const createUser = async (req, res) => {
 
         return res.status(500).json({"errors": [publicError]});
     }
-    **/
 
     return res.status(201).json({
             "data": {
                 "type": "users",
-                "attributes": user,
+                "attributes": publicUser,
                 "links": {
                     "self": `/api/v1/users/${ user.username }`
                 }
@@ -395,12 +355,19 @@ const updateUser = async (req, res) => {
     let errors = [];
     let user = {};
 
-    const topLevelError = requireTopLevel(req, res);
+    const topLevelError = requireTopLevel(req);
+    const userTopLevelError = requireUserTopLevel(req);
 
     // Check if the error is empty
     if( Object.keys(topLevelError).length > 0 ) {
         return res.status(400).json({
             "errors": [topLevelError]
+        });
+    }
+
+    if( Object.keys(userTopLevelError).length > 0 ) {
+        return res.status(400).json({
+            "errors": [userTopLevelError]
         });
     }
 
@@ -462,7 +429,7 @@ const updateUser = async (req, res) => {
     /**
      * Get user from the database
      */
-    const getUserQuery = 'SELECT username, name, email, created_at, updated_at FROM users WHERE users.username=$1';
+    const getUserQuery = 'SELECT username, name, created_at, updated_at FROM users WHERE users.username=$1';
     const getUserValue = [user.username];
 
     let userResult = {};
@@ -569,7 +536,7 @@ const getUser = async (req, res) => {
     /**
      * Make the query
      */
-    const getUserQuery = 'SELECT username, name, email, created_at, updated_at, last_sign_in FROM users WHERE users.username=$1';
+    const getUserQuery = 'SELECT username, name, created_at, updated_at, last_sign_in FROM users WHERE users.username=$1';
     const getUserValue = [req.params.username];
 
     let getUserResult = {};
@@ -623,7 +590,7 @@ const getAllUsers = async (req, res) => {
     /**
      * SQL Query
      */
-    const getAllUsersQuery = 'SELECT username, email, name, created_at FROM users LIMIT 10';
+    const getAllUsersQuery = 'SELECT username, name, created_at FROM users LIMIT 10';
 
     let getAllUsersResult = {};
 
@@ -631,7 +598,9 @@ const getAllUsers = async (req, res) => {
         getAllUsersResult = await db.query(getAllUsersQuery, []);
     } catch(error) {
         let publicError = JSONcopy(errors["500"]);
-        publicError.detail = error;
+
+        if(error.code === '42P01')
+            publicError.detail = "The table requested does not exist.";
 
         return res.status(500).json({ "errors": [publicError] });
     }
