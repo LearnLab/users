@@ -1,6 +1,3 @@
-'use strict';
-
-const db = require('../db/');
 const { User } = require('../models/user');
 const { JSONcopy, trim } = require('../lib/helpers');
 const { Errors } = require('../errors/Errors');
@@ -34,13 +31,7 @@ const UsersController = {
      */
     create: async (req, res) => {
 
-        let user = new User();
-        user.hash(req.body.data.attributes.password, req.body.data.attributes.confirm_password);
-
-        /**
-         * Check that neither the username nor the email exist
-         */
-        const existent = User.where('username', user.username).where('email', user.email, 'or').getOne();
+        const existent = User.find(req.body.data.attributes.username);
 
         if (existent) {
             let publicError = JSONcopy(Errors["400"]);
@@ -50,8 +41,14 @@ const UsersController = {
             return res.status(400).json({ "errors": [publicError] });
         }
 
+        let user = new User();
+        user.username(req.body.data.attributes.username);
+        user.email(req.body.data.attributes.email);
+        user.hash(req.body.data.attributes.password, req.body.data.attributes.confirm_password);
+
         // All good, proceed with the insertion
-        user.save();
+        if( !user.save() )
+            return res.status(500).json({ "errors": user.errors });
 
         return res.status(201).json({
                 "data": {
@@ -65,15 +62,16 @@ const UsersController = {
     },
 
     /**
-    * Use this when updating a User
-    *
-    * @param {object} req
-    * @param {object} res
-    * @returns {object} object
-    */
+     * Use this when updating a User
+     *
+     * @param {object} req
+     * @param {object} res
+     * @returns {object} object
+     */
     update: async (req, res) => {
 
         let user = User.find(req.params.username);
+
         if(!user) {
             return res.status(404).json({
                 "errors": [{
@@ -91,7 +89,8 @@ const UsersController = {
         if ( 'name' in req.body.data.attributes )
             user.name( trim(req.body.data.attributes.name) );
 
-        user.update();
+        if( !user.update() )
+            return res.status(500).json({ "errors": user.errors });
 
         return res.status(200).json({
             "data": {
@@ -120,7 +119,8 @@ const UsersController = {
         }
 
         // Deletion
-        user.delete();
+        if( !user.delete() )
+            return res.status(500).json({ "errors": user.errors });
 
         return res.status(204).json({ "data": {} });
     },
@@ -133,10 +133,6 @@ const UsersController = {
     * @returns {object} object
     */
     show: async (req, res) => {
-        const usernameError = validateUsername(req.params.username);
-        if(usernameError)
-            return res.status(400).json({ "errors": [usernameError] });
-
         const user = User.find(req.params.username);
 
         if(!user) {
@@ -152,7 +148,7 @@ const UsersController = {
             "data": {
                 "type": "users",
                 "id": user.username,
-                "attributes": user,
+                "attributes": user.public(),
                 "links": {
                     "self": req.url
                 }
