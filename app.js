@@ -1,3 +1,5 @@
+const { RequireHeader } = require('./middleware/RequireHeader');
+
 const express = require('express');
 const app = express();
 
@@ -10,32 +12,7 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true }));
 
-// Verify the clients Accept and Content-Type headers
-app.use((req, res, next) => {
-  if(!req.accepts().includes('application/vnd.api+json')) {
-    return res.type('application/vnd.api+json').status(406).json({
-      "errors": [{
-        "status": "406",
-        "title": "Not Acceptable",
-        "detail": "The client has not specified the application/vnd.api+json in the accept header"
-      }]
-    });
-  }
-
-  if(req.headers['content-type'] !== 'application/vnd.api+json') {
-    return res.type('application/vnd.api+json').status(415).json({
-      "errors": [{
-        "status": "415",
-        "title": "Unsupported Media Type",
-        "detail": "The content-type header of the request is not supported, it has to be of type application/vnd.api+json"
-      }]
-    });
-  }
-
-  res.type('application/vnd.api+json');
-
-  next();
-});
+app.use(RequireHeader);
 
 app.use('/api/v1', apiRouter);
 
@@ -45,7 +22,7 @@ app.use(function(req, res, next) {
     "errors": [
       {
         "status": "404",
-        "source": { "pointer": req.path },
+        "source": { "pointer": "/" },
         "title": "Resource not found",
         "detail": "Sorry, we couldn't find the resource you were looking for, maybe you misspoke?"
       }
