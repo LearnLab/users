@@ -1,63 +1,37 @@
-const { RequireHeader } = require('./middleware/RequireHeader');
-
 const express = require('express');
+const { RequireHeader } = require('./middleware/RequireHeader');
+const {
+  FAIL_DECODING_URI_PARAM,
+  UNAUTHORIZED_ACCESS,
+  RESOURCE_NOT_FOUND,
+} = require('./errors');
+
 const app = express();
 
-const port = process.env.PORT || '3000';
+const port = process.env.PORT || 3000;
 
-var apiRouter = require('./routes/api');
+const apiRouter = require('./routes/api');
 
-app.use(express.json({
-  type: "application/vnd.api+json"
-}));
-app.use(express.urlencoded({ extended: true }));
+app.use(
+  express.json({ type: 'application/vnd.api+json' }),
+  express.urlencoded({ extended: true }),
+);
 
 app.use(RequireHeader);
 
 app.use('/api/v1', apiRouter);
 
 // Catch 404 and return error response
-app.use(function(req, res, next) {
-  return res.status(404).json({
-    "errors": [
-      {
-        "status": "404",
-        "source": { "pointer": "/" },
-        "title": "Resource not found",
-        "detail": "Sorry, we couldn't find the resource you were looking for, maybe you misspoke?"
-      }
-    ]
-  });
-});
+app.use((_, res) => res.status(404).json({ errors: [RESOURCE_NOT_FOUND] }));
 
 // Error handler
-app.use(function(err, req, res, next) {
-  console.log("The error was", err);
-
+app.use((err, req, res) => {
   if (err.name === 'UnauthorizedError') {
-    return res.status(401).json({
-      "errors": [
-        {
-          "status": "401",
-          "source": { "pointer": req.path },
-          "title": err.name,
-          "detail": "You're not allowed to access this resource."
-        }
-      ]
-    });
+    return res.status(401).json({ errors: [UNAUTHORIZED_ACCESS] });
   }
 
   if (err.name === 'URIError') {
-    return res.status(400).json({
-      "errors": [
-        {
-          "status": "400",
-          "source": { "pointer": "/data/attributes" },
-          "title": err.name,
-          "detail": "Failed to decode the URI param"
-        }
-      ]
-    });
+    return res.status(400).json({ errors: [FAIL_DECODING_URI_PARAM] });
   }
 });
 
@@ -65,7 +39,6 @@ app.use(function(err, req, res, next) {
 if (require.main === module) {
   app.listen(port, () => {
     console.log(`Express started in port ${port}.`);
-    console.log('Press Ctrl + c to terminate.');
   });
 } else {
   module.exports = app;
