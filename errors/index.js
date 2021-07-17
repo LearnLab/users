@@ -16,6 +16,18 @@ const Errors = {
     title: 'Resource not Found',
     detail: 'Sorry, we could not find the resource you were looking for, maybe you misspoke?',
   },
+  NOT_ACCEPTABLE_ACCEPT: {
+    status: '406',
+    source: { pointer: '/' },
+    title: 'Not Acceptable',
+    detail: 'The client must explicitly include application/vnd.api+json in the accept header',
+  },
+  UNSUPPORTED_CONTENT_TYPE: {
+    status: '415',
+    source: { pointer: '/' },
+    title: 'Unsupported Content type',
+    detail: 'The Content-Type header needs to explicitly include application/vnd.api+json',
+  },
   UNKNOWN_INTERNAL_ERROR: {
     status: '500',
     source: { pointer: '/' },
