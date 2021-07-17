@@ -2,8 +2,9 @@ const { INVALID_TOP_LEVEL } = require('../errors');
 const RequireTopLevel = require('../middleware/RequireTopLevel');
 
 test('top level structure is required', () => {
-  const req = {};
+  const req = { body: {} };
   const res = {
+    status: jest.fn().mockReturnThis(),
     json: jest.fn(),
   };
   const next = jest.fn();
