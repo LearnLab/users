@@ -16,17 +16,11 @@ const Errors = {
     title: 'Resource not Found',
     detail: 'Sorry, we could not find the resource you were looking for, maybe you misspoke?',
   },
-  406: {
-    status: 406,
-    title: 'Not Acceptable',
-  },
-  415: {
-    status: 415,
-    title: 'Unsupported Media Type',
-  },
-  500: {
-    status: 500,
-    title: 'Unknown Internal Server Error',
+  UNKNOWN_INTERNAL_ERROR: {
+    status: '500',
+    source: { pointer: '/' },
+    title: 'Internal Server Error',
+    detail: 'There as an unknown internal server error. Communicate with client customer service',
   },
 };
 
