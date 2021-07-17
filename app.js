@@ -4,6 +4,7 @@ const {
   FAIL_DECODING_URI_PARAM,
   UNAUTHORIZED_ACCESS,
   RESOURCE_NOT_FOUND,
+  UNKNOWN_INTERNAL_ERROR,
 } = require('./errors');
 
 const app = express();
@@ -33,6 +34,8 @@ app.use((err, req, res) => {
   if (err.name === 'URIError') {
     return res.status(400).json({ errors: [FAIL_DECODING_URI_PARAM] });
   }
+
+  return res.status(500).json({ errors: [UNKNOWN_INTERNAL_ERROR] });
 });
 
 // Check if the app should listen or be exported as a module
